@@ -4,6 +4,11 @@ const canvas = document.querySelector('canvas');
 const score = document.querySelector('p');
 const ctx = canvas.getContext('2d');
 const controlMap = {};
+const mouseLocation = {};
+const touchLocation = {};
+let keyboardControl = true;
+let mouseControl = false;
+let touchControl = false;
 
 
 let ballsCount = 0;
@@ -91,6 +96,8 @@ function EvilCircle(x, y, velX, velY, exists) {
   Shape.call(this, x, y, velX, velY, exists);
   this.color = 'white';
   this.size = 10;
+  this.vel = Math.sqrt(velX*velX + velY*velY);
+  this.velX = this.velY = this.vel / Math.sqrt(2);
 }
 
 EvilCircle.prototype = Object.create(Shape.prototype);
@@ -125,25 +132,100 @@ EvilCircle.prototype.update = function() {
   if ((this.y - this.size) <= 0) {
     this.y += this.size;
   }
-  for (const key in controlMap) {
-    if (!controlMap[key]) continue;
-    if (key === 'a') {
-      this.x -= this.velX;
-    } else if (key === 'd') {
-      this.x += this.velX;
-    } else if (key === 'w') {
-      this.y -= this.velY;
-    } else if (key === 's') {
-      this.y += this.velY;
+  if (keyboardControl) {
+    let vel;
+    if (Object.keys(controlMap).length == 1) {
+      vel = this.vel;
+    } else {
+      vel = this.velX;
+    }
+    for (const key in controlMap) {
+      if (key === 'a') {
+        this.x -= vel;
+      } else if (key === 'd') {
+        this.x += vel;
+      } else if (key === 'w') {
+        this.y -= vel;
+      } else if (key === 's') {
+        this.y += vel;
+      }  
     }  
+  }
+  if (mouseControl || touchControl) {
+    if (mouseControl) {
+      loc = mouseLocation;
+    } else {
+      loc = touchLocation;
+    }
+    let dx = this.x - loc.x;
+    let dy = this.y - loc.y;
+    const denom = dx*dx + dy*dy
+    vx = this.vel * Math.abs(dx) * Math.sqrt(1 / denom);
+    vy = this.vel * Math.abs(dy) * Math.sqrt(1 / denom);
+    if (dx < 0) {
+      this.x += vx;
+    } else if (dx > 0) {
+      this.x -= vx;
+    }
+    if (dy < 0) {
+      this.y += vy;
+    } else if (dy > 0) {
+      this.y -= vy;
+    }
   }
 };
 
 window.onkeydown = window.onkeyup = function(e) {
   e = e || event;
-  controlMap[e.key] = e.type == 'keydown';
+  if (!keyboardControl) {
+    keyboardControl = true;
+    mouseControl = false;
+    touchControl = false;
+  }
+  if (e.type == 'keydown') {
+    controlMap[e.key] = true;
+  } else if (e.key in controlMap) {
+    delete controlMap[e.key];
+  }
 };
 
+window.onmousemove = function(e) {
+  e = e || event;
+  if (!mouseControl) {
+    mouseControl = true;
+    keyboardControl = false;
+    touchControl = false;
+  }
+  mouseLocation.x = e.clientX;
+  mouseLocation.y = e.clientY;
+}
+
+function handleTouch(e) {
+  e.preventDefault();
+  if (!touchControl) {
+    touchControl = true;
+    mouseControl = false;
+    keyboardControl = false;
+  }
+
+  var touches = e.changedTouches;
+
+  touchLocation.x = touches[0].pageX;
+  touchLocation.y = touches[0].pageY;
+}
+
+function handleTouchEnd(e) {
+  e = e || event;
+  e.preventDefault();
+  touchControl = false;
+  mouseControl = false;
+  keyboardControl = true;
+}
+
+canvas.addEventListener('touchstart', handleTouch, false);
+canvas.addEventListener('touchmove', handleTouch, false);
+canvas.addEventListener('touchend', handleTouchEnd, false);
+canvas.addEventListener('touchcancel', handleTouchEnd, false);
 
 EvilCircle.prototype.collisionDetect = function() {
   for (let j = 0; j < balls.length; j++) {
@@ -178,7 +260,7 @@ while (balls.length < 25) {
 }
 ballsCount = balls.length;
 
-let evilCirlce = new EvilCircle(20, 0, 5, 5, true);
+let evilCirlce = new EvilCircle(20, 0, 3, 3, true);
 
 function loop(ts) {
   requestAnimationFrame(loop);
